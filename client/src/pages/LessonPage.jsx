@@ -1,21 +1,27 @@
-import { useState, useRef } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useParams, Link } from "react-router-dom";
 import { getLesson, generateLesson } from "../utils/api";
-import { useFetch } from "../hooks/useFetch";
 import LessonRenderer from "../components/LessonRenderer";
 import Navbar from "../components/Navbar";
 
 export default function LessonPage() {
   const { id } = useParams();
+  const [lesson, setLesson] = useState(null);
+  const [loading, setLoading] = useState(true);
   const [generating, setGenerating] = useState(false);
   const [exporting, setExporting] = useState(false);
+  const [loadError, setLoadError] = useState("");
   const [actionError, setActionError] = useState("");
   const contentRef = useRef(null);
 
-  const { data: lesson, setData: setLesson, loading, error: loadError } = useFetch(
-    () => getLesson(id),
-    [id]
-  );
+  useEffect(() => {
+    setLoading(true);
+    setLoadError("");
+    getLesson(id)
+      .then(({ data }) => setLesson(data))
+      .catch(() => setLoadError("Could not load lesson."))
+      .finally(() => setLoading(false));
+  }, [id]);
 
   const handleGenerate = async () => {
     setGenerating(true);
@@ -104,7 +110,6 @@ export default function LessonPage() {
       <Navbar />
       <div className="min-h-screen" style={{ background: "var(--bg-app)" }}>
         <main className="max-w-2xl mx-auto px-6 py-14 fade-in">
-          {/* Back button — top-left, replaces breadcrumb */}
           {courseId && (
             <Link
               to={`/course/${courseId}`}
@@ -123,7 +128,6 @@ export default function LessonPage() {
             {lesson.title}
           </h1>
 
-          {/* Action bar — only shown once content exists; first-time generate lives in EmptyState below */}
           {lesson.isEnriched && (
             <div className="flex items-center gap-3 mb-10 flex-wrap">
               <button
