@@ -6,7 +6,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 dotenv.config({ path: join(__dirname, ".env") });
 
-console.log("API KEY loaded:", process.env.GROQ_API_KEY ? "✅ YES" : "❌ MISSING");
+console.log("API KEY loaded:", process.env.GEMINI_API_KEY ? "✅ YES" : "❌ MISSING");
 
 import express from "express";
 import cors from "cors";
