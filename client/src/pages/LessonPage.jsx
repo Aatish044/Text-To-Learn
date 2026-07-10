@@ -1,33 +1,30 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useRef } from "react";
 import { useParams, Link } from "react-router-dom";
 import { getLesson, generateLesson } from "../utils/api";
+import { useFetch } from "../hooks/useFetch";
 import LessonRenderer from "../components/LessonRenderer";
 import Navbar from "../components/Navbar";
 
 export default function LessonPage() {
   const { id } = useParams();
-  const [lesson, setLesson] = useState(null);
-  const [loading, setLoading] = useState(true);
   const [generating, setGenerating] = useState(false);
   const [exporting, setExporting] = useState(false);
-  const [error, setError] = useState("");
+  const [actionError, setActionError] = useState("");
   const contentRef = useRef(null);
 
-  useEffect(() => {
-    getLesson(id)
-      .then(({ data }) => setLesson(data))
-      .catch(() => setError("Could not load lesson."))
-      .finally(() => setLoading(false));
-  }, [id]);
+  const { data: lesson, setData: setLesson, loading, error: loadError } = useFetch(
+    () => getLesson(id),
+    [id]
+  );
 
   const handleGenerate = async () => {
     setGenerating(true);
-    setError("");
+    setActionError("");
     try {
       const { data } = await generateLesson(id);
       setLesson(data);
     } catch (e) {
-      setError(e?.response?.data?.error || "Generation failed. Check your API key.");
+      setActionError(e?.response?.data?.error || "Generation failed. Check your API key.");
     } finally {
       setGenerating(false);
     }
@@ -42,7 +39,6 @@ export default function LessonPage() {
         import("html2canvas"),
       ]);
 
-      // Read the real computed color so this never drifts from theme.css
       const bgColor = getComputedStyle(document.documentElement)
         .getPropertyValue("--bg-surface")
         .trim();
@@ -68,7 +64,7 @@ export default function LessonPage() {
 
       pdf.save(`${lesson.title}.pdf`);
     } catch (e) {
-      setError("PDF export failed.");
+      setActionError("PDF export failed.");
     } finally {
       setExporting(false);
     }
@@ -78,26 +74,20 @@ export default function LessonPage() {
     return (
       <>
         <Navbar />
-        <div
-          className="min-h-screen flex items-center justify-center"
-          style={{ background: "var(--bg-app)" }}
-        >
+        <div className="min-h-screen flex items-center justify-center" style={{ background: "var(--bg-app)" }}>
           <div className="spinner" />
         </div>
       </>
     );
 
-  if (!lesson || error)
+  if (!lesson || loadError)
     return (
       <>
         <Navbar />
-        <div
-          className="min-h-screen flex items-center justify-center"
-          style={{ background: "var(--bg-app)" }}
-        >
+        <div className="min-h-screen flex items-center justify-center" style={{ background: "var(--bg-app)" }}>
           <div className="text-center">
             <p className="font-mono text-sm mb-4" style={{ color: "var(--error)" }}>
-              {error || "Lesson not found."}
+              {loadError || "Lesson not found."}
             </p>
             <Link to="/" className="font-mono text-sm" style={{ color: "var(--accent)" }}>
               ← Back to Home
@@ -114,111 +104,68 @@ export default function LessonPage() {
       <Navbar />
       <div className="min-h-screen" style={{ background: "var(--bg-app)" }}>
         <main className="max-w-2xl mx-auto px-6 py-14 fade-in">
-          {/* Breadcrumb */}
-          <div className="flex items-center gap-2 mb-6 text-sm font-mono flex-wrap">
-            <Link to="/" style={{ color: "var(--accent)" }}>
-              Home
+          {/* Back button — top-left, replaces breadcrumb */}
+          {courseId && (
+            <Link
+              to={`/course/${courseId}`}
+              className="inline-flex items-center gap-1.5 font-mono text-sm mb-8"
+              style={{ color: "var(--accent)" }}
+            >
+              ← Back to course
             </Link>
-            <span style={{ color: "var(--border)" }}>/</span>
-            {courseId && (
-              <>
-                <Link to={`/course/${courseId}`} style={{ color: "var(--accent)" }}>
-                  {lesson.module?.course?.title}
-                </Link>
-                <span style={{ color: "var(--border)" }}>/</span>
-              </>
-            )}
-            <span style={{ color: "var(--text-secondary)" }}>{lesson.title}</span>
-          </div>
+          )}
 
-          <p
-            className="font-mono text-xs tracking-widest mb-3"
-            style={{ color: "var(--accent)" }}
-          >
+          <p className="font-mono text-xs tracking-widest mb-3" style={{ color: "var(--accent)" }}>
             {lesson.module?.title?.toUpperCase()}
           </p>
 
-          <h1
-            className="font-display text-4xl font-bold leading-tight mb-8"
-            style={{ color: "var(--text-primary)" }}
-          >
+          <h1 className="font-display text-4xl font-bold leading-tight mb-8" style={{ color: "var(--text-primary)" }}>
             {lesson.title}
           </h1>
 
-          <div className="flex items-center gap-3 mb-10 flex-wrap">
-            {!lesson.isEnriched ? (
+          {/* Action bar — only shown once content exists; first-time generate lives in EmptyState below */}
+          {lesson.isEnriched && (
+            <div className="flex items-center gap-3 mb-10 flex-wrap">
               <button
                 onClick={handleGenerate}
                 disabled={generating}
-                className="px-5 py-2 rounded-lg font-body text-sm font-semibold transition-all"
+                className="px-5 py-2 rounded-lg border font-mono text-sm transition-all"
                 style={{
-                  background: generating ? "var(--bg-elevated)" : "var(--accent)",
-                  color: generating ? "var(--text-tertiary)" : "#1b1a18",
+                  borderColor: "var(--border)",
+                  color: "var(--text-primary)",
+                  background: "var(--bg-surface)",
+                  opacity: generating ? 0.5 : 1,
                   cursor: generating ? "not-allowed" : "pointer",
                 }}
               >
-                {generating ? (
-                  <span className="flex items-center gap-2">
-                    <span className="spinner" style={{ width: 14, height: 14, borderWidth: 2 }} />
-                    Generating…
-                  </span>
-                ) : (
-                  "Generate lesson"
-                )}
+                {generating ? "Regenerating…" : "Regenerate"}
               </button>
-            ) : (
-              <>
-                <button
-                  onClick={handleGenerate}
-                  disabled={generating}
-                  className="px-5 py-2 rounded-lg border font-mono text-sm transition-all"
-                  style={{
-                    borderColor: "var(--border)",
-                    color: "var(--text-primary)",
-                    background: "var(--bg-surface)",
-                    opacity: generating ? 0.5 : 1,
-                    cursor: generating ? "not-allowed" : "pointer",
-                  }}
-                >
-                  {generating ? "Regenerating…" : "Regenerate"}
-                </button>
 
-                <button
-                  onClick={handlePDF}
-                  disabled={exporting}
-                  className="px-5 py-2 rounded-lg border font-mono text-sm transition-all"
-                  style={{
-                    borderColor: "var(--accent)",
-                    color: "var(--accent)",
-                    background: "transparent",
-                    opacity: exporting ? 0.5 : 1,
-                    cursor: exporting ? "not-allowed" : "pointer",
-                  }}
-                >
-                  {exporting ? "Exporting…" : "Export PDF"}
-                </button>
-              </>
-            )}
-          </div>
+              <button
+                onClick={handlePDF}
+                disabled={exporting}
+                className="px-5 py-2 rounded-lg border font-mono text-sm transition-all"
+                style={{
+                  borderColor: "var(--accent)",
+                  color: "var(--accent)",
+                  background: "transparent",
+                  opacity: exporting ? 0.5 : 1,
+                  cursor: exporting ? "not-allowed" : "pointer",
+                }}
+              >
+                {exporting ? "Exporting…" : "Export PDF"}
+              </button>
+            </div>
+          )}
 
           {lesson.objectives?.length > 0 && (
-            <div
-              className="mb-10 p-5 rounded-xl border"
-              style={{ background: "var(--bg-surface)", borderColor: "var(--border)" }}
-            >
-              <p
-                className="font-mono text-xs tracking-widest mb-3"
-                style={{ color: "var(--accent)" }}
-              >
+            <div className="mb-10 p-5 rounded-xl border" style={{ background: "var(--bg-surface)", borderColor: "var(--border)" }}>
+              <p className="font-mono text-xs tracking-widest mb-3" style={{ color: "var(--accent)" }}>
                 LEARNING OBJECTIVES
               </p>
               <ul className="space-y-2">
                 {lesson.objectives.map((obj, i) => (
-                  <li
-                    key={i}
-                    className="flex gap-2.5 font-body text-sm leading-relaxed"
-                    style={{ color: "var(--text-secondary)" }}
-                  >
+                  <li key={i} className="flex gap-2.5 font-body text-sm leading-relaxed" style={{ color: "var(--text-secondary)" }}>
                     <span style={{ color: "var(--success)", flexShrink: 0 }}>•</span>
                     {obj}
                   </li>
@@ -227,12 +174,12 @@ export default function LessonPage() {
             </div>
           )}
 
-          {error && (
+          {actionError && (
             <div
               className="mb-6 p-4 rounded-lg border font-mono text-sm"
               style={{ borderColor: "var(--error)", background: "transparent", color: "var(--error)" }}
             >
-              {error}
+              {actionError}
             </div>
           )}
 
@@ -251,14 +198,8 @@ export default function LessonPage() {
 
 function EmptyState({ onGenerate, generating }) {
   return (
-    <div
-      className="text-center py-24 rounded-2xl border"
-      style={{ borderColor: "var(--border)", background: "var(--bg-surface)" }}
-    >
-      <h3
-        className="font-display text-2xl font-semibold mb-2"
-        style={{ color: "var(--text-primary)" }}
-      >
+    <div className="text-center py-24 rounded-2xl border" style={{ borderColor: "var(--border)", background: "var(--bg-surface)" }}>
+      <h3 className="font-display text-2xl font-semibold mb-2" style={{ color: "var(--text-primary)" }}>
         Lesson not yet generated
       </h3>
       <p className="font-body text-sm mb-10" style={{ color: "var(--text-tertiary)" }}>
