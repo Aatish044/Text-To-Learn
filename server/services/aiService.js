@@ -1,33 +1,25 @@
-import { GoogleGenerativeAI } from "@google/generative-ai";
+import Groq from "groq-sdk";
 
-const MODEL = "gemini-2.0-flash";
+const MODEL = "llama-3.3-70b-versatile";
 
 function getClient() {
-  return new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+  return new Groq({ apiKey: process.env.GROQ_API_KEY });
 }
 
 async function askAI(prompt) {
-  const genAI = getClient();
-  const model = genAI.getGenerativeModel({
+  const groq = getClient();
+  const response = await groq.chat.completions.create({
     model: MODEL,
-    generationConfig: {
-      temperature: 0.7,
-      maxOutputTokens: 3000,
-      responseMimeType: "application/json", 
-    },
+    messages: [{ role: "user", content: prompt }],
+    max_tokens: 3000,
+    temperature: 0.7,
   });
 
-  const result = await model.generateContent(prompt);
-  const text = result.response.text();
+  const text = response.choices[0]?.message?.content || "";
   console.log("AI response:", text);
-
-  try {
-    return JSON.parse(text);
-  } catch {
-    const jsonMatch = text.match(/\{[\s\S]*\}/);
-    if (!jsonMatch) throw new Error("No JSON found in AI response: " + text);
-    return JSON.parse(jsonMatch[0]);
-  }
+  const jsonMatch = text.match(/\{[\s\S]*\}/);
+  if (!jsonMatch) throw new Error("No JSON found in AI response: " + text);
+  return JSON.parse(jsonMatch[0]);
 }
 
 export async function generateCourseOutline(topic) {
@@ -75,7 +67,7 @@ Return ONLY a valid JSON object. No markdown, no backticks, no extra text.
     { "type": "paragraph", "text": "Write 4-5 educational sentences here." },
     { "type": "heading", "text": "Core Concepts" },
     { "type": "paragraph", "text": "Write 4-5 sentences explaining core concepts." },
-    { "type": "code", "language": "javascript", "text": "// relevant code example\\nconsole.log('example');" },
+    { "type": "code", "language": "javascript", "text": "// relevant code example\nconsole.log('example');" },
     { "type": "heading", "text": "Key Takeaways" },
     { "type": "paragraph", "text": "Write 3-4 sentences summarizing the lesson." },
     { "type": "video", "query": "youtube search query for this lesson topic" },
